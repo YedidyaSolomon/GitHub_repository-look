@@ -1,4 +1,4 @@
-import { supabase } from '@/lib/supabase';
+import { supabaseAdmin } from '@/lib/supabase-admin';
 import { NextRequest, NextResponse } from 'next/server';
 
 export async function POST(request: NextRequest) {
@@ -45,7 +45,7 @@ export async function POST(request: NextRequest) {
 
     if (chapaStatus !== 'success') {
       // Update transaction status to failed
-      await supabase
+      await supabaseAdmin
         .from('transactions')
         .update({ status: 'failed', verified: false })
         .eq('tx_ref', tx_ref);
@@ -65,7 +65,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Update transaction record
-    const { error: txUpdateError } = await supabase
+    const { error: txUpdateError } = await supabaseAdmin
       .from('transactions')
       .update({
         status: 'success',
@@ -98,7 +98,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Update subscription record
-    const { error: subUpdateError } = await supabase
+    const { error: subUpdateError } = await supabaseAdmin
       .from('subscriptions')
       .update({
         status: 'ACTIVE',
@@ -118,7 +118,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Update business subscription status and activate subscription
-    const { error: businessUpdateError } = await supabase
+    const { error: businessUpdateError } = await supabaseAdmin
       .from('businesses')
       .update({
         subscription_status: 'ACTIVE',

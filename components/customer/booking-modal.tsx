@@ -114,44 +114,37 @@ export default function BookingModal({
         throw new Error('Please fill in all required fields');
       }
 
-      // Check if slot is still available (double-booking prevention)
-      const { data: existingBooking } = await supabase
-        .from('bookings')
-        .select('id')
-        .eq('specialist_id', specialist.id)
-        .eq('booking_date', formData.booking_date)
-        .eq('booking_time', formData.booking_time)
-        .single();
-
-      if (existingBooking) {
-        throw new Error('This time slot has been booked. Please select another time.');
-      }
-
-      // Create booking with guest or authenticated user data
+      // Create booking payload
       const bookingData: any = {
         service_id: service.id,
         specialist_id: specialist.id,
         business_id: businessId,
         booking_date: formData.booking_date,
         booking_time: formData.booking_time,
-        status: 'confirmed',
       };
 
-      // If authenticated, link to customer profile
       if (profile?.id) {
-        bookingData.customer_id = profile.id;
+        bookingData.booked_by = profile.id; // API expects booked_by mapping
+        bookingData.customer_name = formData.customer_name;
+        bookingData.customer_email = formData.customer_email;
+        bookingData.customer_phone = formData.customer_phone;
       } else {
-        // If guest, save guest info in guest_info columns
         bookingData.guest_name = formData.customer_name;
         bookingData.guest_email = formData.customer_email;
         bookingData.guest_phone = formData.customer_phone;
       }
 
-      const { error: bookingError } = await supabase
-        .from('bookings')
-        .insert(bookingData);
+      // Delegate double-booking validation and insert to the server API
+      const response = await fetch('/api/bookings', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(bookingData),
+      });
 
-      if (bookingError) throw bookingError;
+      const responseData = await response.json();
+      if (!response.ok) {
+        throw new Error(responseData.error || 'Failed to create booking.');
+      }
 
       alert('Booking created successfully! Check your email for confirmation.');
       onOpenChange(false);

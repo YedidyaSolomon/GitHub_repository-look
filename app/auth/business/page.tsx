@@ -222,10 +222,10 @@ export default function BusinessAuth() {
             </div>
 
             <div>
-              <FieldLabel className="text-sm font-medium flex items-center gap-2">
+              <label className="text-sm font-medium flex items-center gap-2">
                 <Lock className="w-4 h-4" />
                 Password
-              </FieldLabel>
+              </label>
               <Input
                 type="password"
                 placeholder="At least 6 characters"
@@ -237,10 +237,10 @@ export default function BusinessAuth() {
 
             {isSignup && (
               <div>
-                <FieldLabel className="text-sm font-medium flex items-center gap-2">
+                <label className="text-sm font-medium flex items-center gap-2">
                   <Lock className="w-4 h-4" />
                   Confirm Password
-                </FieldLabel>
+                </label>
                 <Input
                   type="password"
                   placeholder="Confirm password"

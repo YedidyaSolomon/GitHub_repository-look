@@ -12,18 +12,25 @@ export async function POST(request: NextRequest) {
       customer_name,
       customer_email,
       customer_phone,
+      guest_name,
+      guest_email,
+      guest_phone,
       booking_date,
       booking_time,
       booked_by,
     } = body;
+
+    const finalCustomerName = customer_name || guest_name;
+    const finalCustomerEmail = customer_email || guest_email;
+    const finalCustomerPhone = customer_phone || guest_phone || '';
 
     // Validate required fields
     if (
       !service_id ||
       !specialist_id ||
       !business_id ||
-      !customer_name ||
-      !customer_email ||
+      !finalCustomerName ||
+      !finalCustomerEmail ||
       !booking_date ||
       !booking_time
     ) {
@@ -65,15 +72,19 @@ export async function POST(request: NextRequest) {
     }
 
     // Create booking
+    // Map the guest names as requested but also guarantee customer_name/email/phone for strict SETUP_GUIDE schema alignment
     const { data, error } = await supabase
       .from('bookings')
       .insert({
         service_id,
         specialist_id,
         business_id,
-        customer_name,
-        customer_email,
-        customer_phone: customer_phone || '',
+        customer_name: finalCustomerName,
+        customer_email: finalCustomerEmail,
+        customer_phone: finalCustomerPhone,
+        guest_name: guest_name || null,
+        guest_email: guest_email || null,
+        guest_phone: guest_phone || null,
         booking_date,
         booking_time,
         booked_by: booked_by || null,
