@@ -6,6 +6,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Spinner } from '@/components/ui/spinner';
+import Link from "next/link";
 import { Calendar, Users } from 'lucide-react';
 
 interface BusinessCardProps {
@@ -76,6 +77,13 @@ export default function BusinessCard({ business, onBookService }: BusinessCardPr
             <div className="text-2xl font-bold">{specialists.length}</div>
           </div>
         </div>
+
+        {/* View Full Profile Button */}
+        <Button asChild variant="outline" size="sm" className="w-full mt-2">
+<Link href={`/business/${business.id}`}>
+            View Full Profile & Book →
+          </Link>
+        </Button>
 
         {/* Services List */}
         {services.length > 0 && specialists.length > 0 ? (

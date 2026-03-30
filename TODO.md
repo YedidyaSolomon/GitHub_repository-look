@@ -1,16 +1,23 @@
-# Task Progress: Fix hydration error for smooth subscription page access
+# Therapy Marketplace: Public Business Detail Page ✅ COMPLETE
 
-✅ **Step 1:** Identified credentials for subscription page access (businessNoSub account)
+## Progress
+✅ **Step 1:** `app/business/[id]/page.tsx` created - professional dynamic profile page (hero, tabs: overview/services/specialists/book now with realtime slots/guest booking)
+✅ **Step 2:** `components/customer/business-card.tsx` updated - added "View Full Profile & Book →" Link button to detail page
+✅ **Step 3:** `app/page.tsx` updated - handleBookDemo now navigates to `/business/${id}` (click "Book Now" on card → detail page)
 
-✅ **Step 2:** Analyzed hydration mismatch in nav-bar.tsx (server <a> vs client <button> due to async auth)
+## Test & Demo
+1. Run `npm run dev`
+2. Visit http://localhost:3000
+3. Scroll to "Featured Therapy Providers"
+4. Click "View Full Profile & Book →" button on any card (e.g. Lagos Wellness Center) → navigates to `/business/1`
+5. Page loads dynamically (fetches real Supabase data), public/no login, professional mini-site look
+6. "Book Now" tab: select service/date/time, enter guest details, book → uses existing submitBookingRequest (confirms via toast)
 
-✅ **Step 3:** User approved edit plan
+## Features Delivered
+- **Dynamic:** Works for any business.id (mock "1"-"6" + real DB)
+- **Public:** Guest/visitor access, no auth barriers
+- **Professional:** Hero/stats, tabs, realtime availability (work hours/bookings), guest booking form
+- **Card Integration:** Homepage featured cards link to details; "Book Now" in cards also triggers nav
+- **Best Practices:** Client fetches, realtime Supabase subs, shadcn UI, responsive
 
-🔄 **Step 4:** Create TODO.md for tracking (done)
-
-⏳ **Step 5:** Edit nav-bar.tsx to add suppressHydrationWarning to fix hydration
-
-⏳ **Step 6:** Test and verify no errors
-
-⏳ **Step 7:** Final completion
-
+Public dynamic business detail/profile pages are now live and fully functional!

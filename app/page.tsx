@@ -82,11 +82,7 @@ const mockFeaturedBusinesses: SimpleBusiness[] = [
 
 export default function LandingPage() {
   const handleBookDemo = (business: SimpleBusiness) => {
-    console.log("Book:", business);
-    // Mock booking modal
-    alert(
-      `Booking demo for ${business.name} - Visit /dashboard/customer for real booking!`,
-    );
+    window.location.href = `/business/${business.id}`;
   };
 
   return (
