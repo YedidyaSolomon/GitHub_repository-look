@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import { Analytics } from "@vercel/analytics/next";
 import { AuthProvider } from "@/lib/auth-context";
+import { Toaster } from "@/components/ui/toaster";
 import "./globals.css";
 import dynamic from "next/dynamic";
 
@@ -49,6 +50,7 @@ export default function RootLayout({
         <AuthProvider>
           <DynamicNavBar />
           {children}
+          <Toaster />
         </AuthProvider>
         <Analytics />
       </body>

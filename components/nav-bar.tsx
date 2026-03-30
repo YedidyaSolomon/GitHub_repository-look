@@ -14,6 +14,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
+import Image from "next/image";
 import {
   LogOut,
   Menu,
@@ -54,10 +55,15 @@ export default function NavBar() {
     <nav className="sticky top-0 z-50 bg-card/80 backdrop-blur-md border-b border-border">
       <div className="container mx-auto px-4 py-4 flex items-center justify-between">
         <Link href="/" className="flex items-center gap-3 group">
-          <div className="w-11 h-11 bg-gradient-to-r from-[var(--purple)] to-[var(--gold)] rounded-xl flex items-center justify-center text-white font-bold text-lg shadow-lg group-hover:scale-105 transition-transform">
-            DH
-          </div>
-          <span className="font-bold text-xl hidden md:inline">Dvora Hub</span>
+          <Image
+            src="/devora1.jpg"
+            alt="Dvora Hub"
+            width={176}
+            height={44}
+            className="h-10 w-auto md:h-12 lg:h-14 max-w-[180px] object-contain group-hover:scale-105 transition-transform shadow-lg"
+            priority
+          />
+          <span className="font-bold text-xl hidden md:inline sr-only">Dvora Hub</span>
         </Link>
 
         {/* Desktop Nav & CTA */}
@@ -100,7 +106,7 @@ export default function NavBar() {
             {profile ? (
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
-                  <Button variant="ghost" className="h-10 px-3">
+                  <Button variant="ghost" className="h-10 px-3" suppressHydrationWarning>
                     <Avatar className="h-8 w-8">
                       <AvatarImage src={profile.avatar_url} />
                       <AvatarFallback>
@@ -143,16 +149,17 @@ export default function NavBar() {
               </DropdownMenu>
             ) : (
               <>
-                <Link href="/auth/customer">
-                  <Button variant="ghost" size="sm" className="h-10 px-3">
+                <Button asChild variant="ghost" size="sm" className="h-10 px-3" suppressHydrationWarning>
+                  <Link href="/auth/customer" suppressHydrationWarning>
                     Login
-                  </Button>
-                </Link>
+                  </Link>
+                </Button>
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
                     <Button
                       size="sm"
                       className="h-10 bg-[var(--purple)] hover:bg-[var(--purple)]/90"
+                      suppressHydrationWarning
                     >
                       Register
                       <ChevronDown className="ml-1 h-4 w-4" />
@@ -194,10 +201,15 @@ export default function NavBar() {
               {/* Mobile Logo */}
               <div className="p-6 border-b border-border">
                 <Link href="/" className="flex items-center gap-3">
-                  <div className="w-10 h-10 bg-gradient-to-r from-[var(--purple)] to-[var(--gold)] rounded-xl flex items-center justify-center text-white font-bold text-lg">
-                    DH
-                  </div>
-                  <span className="font-bold text-xl">Dvora Hub</span>
+                  <Image
+                    src="/devora1.jpg"
+                    alt="Dvora Hub"
+                    width={176}
+                    height={44}
+                    className="h-10 w-auto md:h-12 lg:h-14 max-w-[180px] object-contain group-hover:scale-105 transition-transform shadow-lg"
+                    priority
+                  />
+                  <span className="font-bold text-xl sr-only">Dvora Hub</span>
                 </Link>
               </div>
 
@@ -249,12 +261,12 @@ export default function NavBar() {
                     </Button>
                   ) : (
                     <div className="flex flex-col gap-3">
-                      <Link href="/auth/customer">
-                        <Button className="w-full h-12 bg-[var(--purple)] hover:bg-[var(--purple)]/90">
+                      <Button asChild className="w-full h-12 bg-[var(--purple)] hover:bg-[var(--purple)]/90">
+                        <Link href="/auth/customer">
                           <UserPlus className="mr-2 h-4 w-4" />
                           Login
-                        </Button>
-                      </Link>
+                        </Link>
+                      </Button>
                       <Link href="/auth/business">
                         <Button variant="outline" className="w-full h-12">
                           <Building2 className="mr-2 h-4 w-4" />

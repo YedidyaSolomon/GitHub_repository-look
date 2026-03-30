@@ -1,7 +1,17 @@
 import { supabase } from '@/lib/supabase';
 import { NextRequest, NextResponse } from 'next/server';
 
+function mockDisabled() {
+  return process.env.NEXT_PUBLIC_USE_MOCK === 'true';
+}
+
 export async function POST(request: NextRequest) {
+  if (mockDisabled()) {
+    return NextResponse.json(
+      { error: 'Bookings API is disabled in demo mode; use the app UI.' },
+      { status: 501 }
+    );
+  }
   try {
     const body = await request.json();
 
@@ -54,17 +64,19 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Check for double-booking (conflict detection)
-    const { data: existingBooking, error: checkError } = await supabase
+    const { data: existingRows } = await supabase
       .from('bookings')
-      .select('id')
+      .select('id, status')
       .eq('specialist_id', specialist_id)
       .eq('booking_date', booking_date)
-      .eq('booking_time', booking_time)
-      .eq('status', 'confirmed')
-      .single();
+      .eq('booking_time', booking_time);
 
-    if (!checkError && existingBooking) {
+    const statusBlocks = (raw: string | null | undefined) => {
+      const s = (raw || '').toLowerCase();
+      return s !== 'cancelled' && s !== 'canceled';
+    };
+    const conflict = existingRows?.some((row) => statusBlocks(row.status as string));
+    if (conflict) {
       return NextResponse.json(
         { error: 'This time slot is already booked. Please select another time.' },
         { status: 409 }
@@ -112,6 +124,12 @@ export async function POST(request: NextRequest) {
 }
 
 export async function GET(request: NextRequest) {
+  if (mockDisabled()) {
+    return NextResponse.json(
+      { error: 'Bookings API is disabled in demo mode.' },
+      { status: 501 }
+    );
+  }
   try {
     const { searchParams } = new URL(request.url);
     const specialistId = searchParams.get('specialist_id');

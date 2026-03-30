@@ -1,8 +1,22 @@
-import { supabase } from '@/lib/supabase';
+import { supabaseAdmin } from '@/lib/supabase-admin';
 import { NextRequest, NextResponse } from 'next/server';
 import crypto from 'crypto';
 
+function appBaseUrl() {
+  return (
+    process.env.NEXT_PUBLIC_APP_URL?.replace(/\/$/, '') ||
+    (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : null) ||
+    'http://localhost:3000'
+  );
+}
+
 export async function POST(request: NextRequest) {
+  if (process.env.NEXT_PUBLIC_USE_MOCK === 'true') {
+    return NextResponse.json(
+      { error: 'Chapa is disabled in demo mode; subscribe from the app UI.' },
+      { status: 501 }
+    );
+  }
   try {
     const body = await request.json();
     const { business_id, plan } = body;
@@ -21,10 +35,11 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Fetch business details
-    const { data: business, error: fetchError } = await supabase
+    const baseUrl = appBaseUrl();
+
+    const { data: business, error: fetchError } = await supabaseAdmin
       .from('businesses')
-      .select('id, name, owner_id, email')
+      .select('id, name, owner_id, status, subscription_status, is_active_subscription')
       .eq('id', business_id)
       .single();
 
@@ -34,6 +49,32 @@ export async function POST(request: NextRequest) {
         { status: 404 }
       );
     }
+
+    if (business.status !== 'APPROVED') {
+      return NextResponse.json(
+        { error: 'Business must be approved before subscribing' },
+        { status: 403 }
+      );
+    }
+
+    if (business.is_active_subscription || business.subscription_status === 'ACTIVE') {
+      return NextResponse.json(
+        { error: 'Subscription is already active' },
+        { status: 400 }
+      );
+    }
+
+    const { data: ownerProfile } = await supabaseAdmin
+      .from('profiles')
+      .select('email, name')
+      .eq('id', business.owner_id)
+      .single();
+
+    const payerEmail =
+      ownerProfile?.email?.trim() || 'support@therapymarketplace.com';
+    const payerFirstName =
+      (ownerProfile?.name || business.name || 'Business').trim().slice(0, 48) ||
+      'Business';
 
     // Define plan pricing
     const planPricing: Record<string, { amount: number; displayName: string }> = {
@@ -76,7 +117,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Create subscription record
-    const { error: subError } = await supabase
+    const { error: subError } = await supabaseAdmin
       .from('subscriptions')
       .insert({
         business_id,
@@ -97,13 +138,13 @@ export async function POST(request: NextRequest) {
     const paymentPayload = {
       amount: selectedPlan.amount,
       currency: 'ETB',
-      email: business.email || 'support@therapymarketplace.com',
-      first_name: business.name,
-      last_name: 'Subscription',
-      title: `${selectedPlan.displayName} Subscription - ${business.name}`,
-      description: `Therapy Marketplace ${selectedPlan.displayName} Subscription`,
-      callback_url: `${process.env.NEXTAUTH_URL || 'http://localhost:3000'}/api/chapa-callback`,
-      return_url: `${process.env.NEXTAUTH_URL || 'http://localhost:3000'}/dashboard/business`,
+      email: payerEmail,
+      first_name: payerFirstName,
+      last_name: 'Practice',
+      title: `${selectedPlan.displayName} Subscription — ${business.name}`,
+      description: `Therapy Marketplace ${selectedPlan.displayName} subscription`,
+      callback_url: `${baseUrl}/api/chapa-callback`,
+      return_url: `${baseUrl}/dashboard/business?payment=complete`,
       tx_ref: tx_ref,
       meta: {
         business_id,

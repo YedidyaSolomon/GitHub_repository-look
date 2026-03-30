@@ -1,30 +1,16 @@
-# Admin Dashboard & Business Registration Task
+# Task Progress: Fix hydration error for smooth subscription page access
 
-## Steps to Complete (Approved Plan)
+✅ **Step 1:** Identified credentials for subscription page access (businessNoSub account)
 
-### 1. [ ] Create TODO.md (Current)
+✅ **Step 2:** Analyzed hydration mismatch in nav-bar.tsx (server <a> vs client <button> due to async auth)
 
-### 2. [x] Install dependencies (react-hook-form, zod, @hookform/resolvers/zod)
+✅ **Step 3:** User approved edit plan
 
-### 3. [ ] Fix Business Registration UI (app/auth/business/page.tsx)
+🔄 **Step 4:** Create TODO.md for tracking (done)
 
-- Remove fullName/confirmPassword
-- Rename physicalAddress → address
-- Use shadcn Form + zod validation
-- Update profiles name: businessName
+⏳ **Step 5:** Edit nav-bar.tsx to add suppressHydrationWarning to fix hydration
 
-### 4. [ ] Enhance Admin Dashboard (app/dashboard/admin/page.tsx)
+⏳ **Step 6:** Test and verify no errors
 
-- Add admin role guard
-- Fetch ALL businesses (not just PENDING)
-- Add columns: Email, Phone, Address, TIN
-- Fix reject status to 'REJECTED'
-- Add Bookings Overview table with joins
+⏳ **Step 7:** Final completion
 
-### 5. [ ] Test registration flow
-
-### 6. [ ] Test admin dashboard (guard, approve/reject, bookings view)
-
-### 7. [ ] Mark complete & attempt_completion
-
-**Next step marked below after completion.**

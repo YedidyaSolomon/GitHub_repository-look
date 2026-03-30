@@ -1,14 +1,28 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { supabase } from '@/lib/supabase';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from '@/components/ui/alert-dialog';
 import { Calendar, Clock, User, Phone, Mail } from 'lucide-react';
+import { toast } from '@/components/ui/use-toast';
+import { Spinner } from '@/components/ui/spinner';
+
+type BookingStatus = 'pending' | 'confirmed' | 'cancelled' | 'completed';
 
 interface Booking {
   id: string;
@@ -19,15 +33,19 @@ interface Booking {
   customer_phone: string;
   booking_date: string;
   booking_time: string;
-  status: 'confirmed' | 'cancelled' | 'completed';
+  status: BookingStatus;
   created_at: string;
-  service?: {
-    name: string;
-    price: number;
-  };
-  specialist?: {
-    name: string;
-  };
+  service?: { name: string; price: number };
+  specialist?: { name: string };
+}
+
+function normalizeStatus(raw: string): BookingStatus {
+  const s = raw.toLowerCase().replace(/\s/g, '');
+  if (s === 'completed') return 'completed';
+  if (s === 'cancelled' || s === 'canceled') return 'cancelled';
+  if (s === 'pending') return 'pending';
+  if (s === 'confirmed' || s === 'confirm') return 'confirmed';
+  return 'confirmed';
 }
 
 interface BookingsTabProps {
@@ -41,11 +59,7 @@ export default function BookingsTab({ businessId }: BookingsTabProps) {
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
 
-  useEffect(() => {
-    fetchBookings();
-  }, [businessId]);
-
-  const fetchBookings = async () => {
+  const fetchBookings = useCallback(async () => {
     try {
       const { data, error } = await supabase
         .from('bookings')
@@ -58,40 +72,66 @@ export default function BookingsTab({ businessId }: BookingsTabProps) {
         .order('booking_date', { ascending: false });
 
       if (error) throw error;
-      if (data) {
-        setBookings(data as Booking[]);
-        setFilteredBookings(data as Booking[]);
-      }
+      const normalized = (data ?? []).map((row: Record<string, unknown>) => ({
+        ...row,
+        status: normalizeStatus(String(row.status ?? 'confirmed')),
+      })) as Booking[];
+      setBookings(normalized);
+      setFilteredBookings(normalized);
     } catch (err) {
       console.error('Error fetching bookings:', err);
+      toast({
+        variant: 'destructive',
+        title: 'Could not load bookings',
+        description: err instanceof Error ? err.message : 'Unknown error',
+      });
     } finally {
       setLoading(false);
     }
-  };
+  }, [businessId]);
 
-  // Apply filters
+  useEffect(() => {
+    void fetchBookings();
+  }, [fetchBookings]);
+
+  useEffect(() => {
+    const channel = supabase
+      .channel(`bookings-tab-${businessId}`)
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'bookings',
+          filter: `business_id=eq.${businessId}`,
+        },
+        () => {
+          void fetchBookings();
+        },
+      )
+      .subscribe();
+
+    return () => {
+      void supabase.removeChannel(channel);
+    };
+  }, [businessId, fetchBookings]);
+
   useEffect(() => {
     let filtered = bookings;
-
-    // Search by customer name or email
     if (searchQuery.trim()) {
-      filtered = filtered.filter(b =>
-        b.customer_name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        b.customer_email.toLowerCase().includes(searchQuery.toLowerCase())
+      filtered = filtered.filter(
+        (b) =>
+          b.customer_name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+          b.customer_email.toLowerCase().includes(searchQuery.toLowerCase()),
       );
     }
-
-    // Filter by status
     if (statusFilter !== 'all') {
-      filtered = filtered.filter(b => b.status === statusFilter);
+      filtered = filtered.filter((b) => b.status === statusFilter);
     }
-
     setFilteredBookings(filtered);
   }, [searchQuery, statusFilter, bookings]);
 
   const handleCancelBooking = async (bookingId: string) => {
-    if (!confirm('Are you sure you want to cancel this booking?')) return;
-
     try {
       const { error } = await supabase
         .from('bookings')
@@ -100,12 +140,17 @@ export default function BookingsTab({ businessId }: BookingsTabProps) {
 
       if (error) throw error;
 
-      setBookings(
-        bookings.map(b => (b.id === bookingId ? { ...b, status: 'cancelled' } : b))
+      setBookings((prev) =>
+        prev.map((b) => (b.id === bookingId ? { ...b, status: 'cancelled' } : b)),
       );
+      toast({ title: 'Booking cancelled', description: 'The slot is released.' });
     } catch (err) {
       console.error('Error cancelling booking:', err);
-      alert('Failed to cancel booking');
+      toast({
+        variant: 'destructive',
+        title: 'Cancel failed',
+        description: err instanceof Error ? err.message : 'Try again.',
+      });
     }
   };
 
@@ -118,160 +163,175 @@ export default function BookingsTab({ businessId }: BookingsTabProps) {
 
       if (error) throw error;
 
-      setBookings(
-        bookings.map(b => (b.id === bookingId ? { ...b, status: 'completed' } : b))
+      setBookings((prev) =>
+        prev.map((b) => (b.id === bookingId ? { ...b, status: 'completed' } : b)),
       );
+      toast({ title: 'Marked complete', description: 'Session saved.' });
     } catch (err) {
       console.error('Error completing booking:', err);
-      alert('Failed to complete booking');
+      toast({
+        variant: 'destructive',
+        title: 'Update failed',
+        description: err instanceof Error ? err.message : 'Try again.',
+      });
     }
   };
 
   const getStatusColor = (status: string) => {
     switch (status) {
+      case 'pending':
       case 'confirmed':
-        return 'bg-blue-100 text-blue-800';
+        return 'bg-sky-100 text-sky-900 dark:bg-sky-950 dark:text-sky-100';
       case 'completed':
-        return 'bg-green-100 text-green-800';
+        return 'bg-emerald-100 text-emerald-900 dark:bg-emerald-950 dark:text-emerald-100';
       case 'cancelled':
-        return 'bg-red-100 text-red-800';
+        return 'bg-red-100 text-red-900 dark:bg-red-950 dark:text-red-100';
       default:
-        return 'bg-gray-100 text-gray-800';
+        return 'bg-muted text-muted-foreground';
     }
   };
 
   if (loading) {
     return (
-      <Card>
-        <CardContent className="py-8">
-          <div className="text-center text-muted-foreground">Loading bookings...</div>
+      <Card className="border-border/80 shadow-sm">
+        <CardContent className="flex flex-col items-center justify-center gap-3 py-16">
+          <Spinner />
+          <p className="text-muted-foreground text-sm">Loading bookings…</p>
         </CardContent>
       </Card>
     );
   }
 
   return (
-    <Card>
+    <Card className="border-border/80 shadow-sm">
       <CardHeader className="space-y-4">
-        <CardTitle>Upcoming & Past Bookings</CardTitle>
-        
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          {/* Search */}
-          <div className="relative">
+        <CardTitle className="text-xl font-semibold">Bookings</CardTitle>
+        <p className="text-muted-foreground text-sm">
+          Updates automatically when customers book or statuses change.
+        </p>
+
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
+          <div className="relative md:col-span-2">
             <Mail className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
             <Input
-              placeholder="Search by customer name or email..."
+              placeholder="Search name or email…"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               className="pl-10"
             />
           </div>
 
-          {/* Status Filter */}
           <Select value={statusFilter} onValueChange={setStatusFilter}>
             <SelectTrigger>
-              <SelectValue placeholder="Filter by status" />
+              <SelectValue placeholder="Status" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="all">All Bookings</SelectItem>
+              <SelectItem value="all">All</SelectItem>
+              <SelectItem value="pending">Pending</SelectItem>
               <SelectItem value="confirmed">Confirmed</SelectItem>
               <SelectItem value="completed">Completed</SelectItem>
               <SelectItem value="cancelled">Cancelled</SelectItem>
             </SelectContent>
           </Select>
-
-          {/* Results count */}
-          <div className="flex items-center justify-end text-sm text-muted-foreground">
-            {filteredBookings.length} booking{filteredBookings.length !== 1 ? 's' : ''}
-          </div>
         </div>
+
+        <p className="text-muted-foreground text-right text-sm">
+          {filteredBookings.length} shown
+        </p>
       </CardHeader>
 
-      <CardContent>
+      <CardContent className="space-y-3">
         {filteredBookings.length === 0 ? (
-          <div className="text-center py-8 text-muted-foreground">
-            No bookings found.
+          <div className="py-12 text-center text-muted-foreground text-sm">
+            No bookings match your filters.
           </div>
         ) : (
-          <div className="space-y-3">
-            {filteredBookings.map(booking => (
-              <Card key={booking.id} className="border">
-                <CardContent className="pt-6">
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    {/* Customer Info */}
-                    <div className="space-y-2">
-                      <div className="flex items-center gap-2">
-                        <User className="w-4 h-4 text-muted-foreground" />
-                        <span className="font-semibold">{booking.customer_name}</span>
-                      </div>
+          filteredBookings.map((booking) => (
+            <Card key={booking.id} className="border-border/80 shadow-sm">
+              <CardContent className="pt-5">
+                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                  <div className="space-y-2">
+                    <div className="flex items-center gap-2">
+                      <User className="h-4 w-4 shrink-0 text-muted-foreground" />
+                      <span className="font-semibold">{booking.customer_name}</span>
+                    </div>
+                    <div className="flex items-center gap-2 text-sm">
+                      <Mail className="h-4 w-4 shrink-0 text-muted-foreground" />
+                      <span className="break-all text-muted-foreground">{booking.customer_email}</span>
+                    </div>
+                    {booking.customer_phone ? (
                       <div className="flex items-center gap-2 text-sm">
-                        <Mail className="w-4 h-4 text-muted-foreground" />
-                        <span className="text-muted-foreground">{booking.customer_email}</span>
+                        <Phone className="h-4 w-4 shrink-0 text-muted-foreground" />
+                        <span className="text-muted-foreground">{booking.customer_phone}</span>
                       </div>
-                      {booking.customer_phone && (
-                        <div className="flex items-center gap-2 text-sm">
-                          <Phone className="w-4 h-4 text-muted-foreground" />
-                          <span className="text-muted-foreground">{booking.customer_phone}</span>
-                        </div>
-                      )}
-                    </div>
-
-                    {/* Booking Details */}
-                    <div className="space-y-2">
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-2">
-                          <Calendar className="w-4 h-4 text-muted-foreground" />
-                          <span className="text-sm">{booking.booking_date}</span>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <Clock className="w-4 h-4 text-muted-foreground" />
-                          <span className="text-sm">{booking.booking_time}</span>
-                        </div>
-                      </div>
-
-                      <div className="text-sm">
-                        <p className="font-medium">{booking.service?.name}</p>
-                        <p className="text-muted-foreground">
-                          Specialist: {booking.specialist?.name}
-                        </p>
-                      </div>
-
-                      <div className="flex items-center justify-between">
-                        <Badge className={getStatusColor(booking.status)}>
-                          {booking.status.charAt(0).toUpperCase() + booking.status.slice(1)}
-                        </Badge>
-                        {booking.service?.price && (
-                          <span className="font-semibold">₦{booking.service.price.toFixed(2)}</span>
-                        )}
-                      </div>
-                    </div>
+                    ) : null}
                   </div>
 
-                  {/* Actions */}
-                  <div className="flex gap-2 justify-end mt-4 pt-4 border-t">
-                    {booking.status === 'confirmed' && (
-                      <>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => handleCompleteBooking(booking.id)}
-                        >
-                          Mark as Complete
-                        </Button>
-                        <Button
-                          variant="destructive"
-                          size="sm"
-                          onClick={() => handleCancelBooking(booking.id)}
-                        >
-                          Cancel
-                        </Button>
-                      </>
-                    )}
+                  <div className="space-y-2">
+                    <div className="flex flex-wrap gap-3 text-sm">
+                      <span className="flex items-center gap-2">
+                        <Calendar className="h-4 w-4 text-muted-foreground" />
+                        {booking.booking_date}
+                      </span>
+                      <span className="flex items-center gap-2">
+                        <Clock className="h-4 w-4 text-muted-foreground" />
+                        {booking.booking_time}
+                      </span>
+                    </div>
+                    <div>
+                      <p className="text-sm font-medium">{booking.service?.name ?? '—'}</p>
+                      <p className="text-muted-foreground text-sm">
+                        Specialist: {booking.specialist?.name ?? '—'}
+                      </p>
+                    </div>
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <Badge className={getStatusColor(booking.status)} variant="secondary">
+                        {booking.status}
+                      </Badge>
+                      {booking.service?.price != null ? (
+                        <span className="font-medium text-sm">
+                          {booking.service.price.toLocaleString()} ETB
+                        </span>
+                      ) : null}
+                    </div>
                   </div>
-                </CardContent>
-              </Card>
-            ))}
-          </div>
+                </div>
+
+                {(booking.status === 'confirmed' || booking.status === 'pending') && (
+                  <div className="mt-4 flex flex-wrap justify-end gap-2 border-t pt-4">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => void handleCompleteBooking(booking.id)}
+                    >
+                      Mark complete
+                    </Button>
+                    <AlertDialog>
+                      <AlertDialogTrigger asChild>
+                        <Button variant="destructive" size="sm">
+                          Cancel booking
+                        </Button>
+                      </AlertDialogTrigger>
+                      <AlertDialogContent>
+                        <AlertDialogHeader>
+                          <AlertDialogTitle>Cancel this booking?</AlertDialogTitle>
+                          <AlertDialogDescription>
+                            The appointment will be marked cancelled and the slot freed.
+                          </AlertDialogDescription>
+                        </AlertDialogHeader>
+                        <AlertDialogFooter>
+                          <AlertDialogCancel>Back</AlertDialogCancel>
+                          <AlertDialogAction onClick={() => void handleCancelBooking(booking.id)}>
+                            Yes, cancel
+                          </AlertDialogAction>
+                        </AlertDialogFooter>
+                      </AlertDialogContent>
+                    </AlertDialog>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          ))
         )}
       </CardContent>
     </Card>

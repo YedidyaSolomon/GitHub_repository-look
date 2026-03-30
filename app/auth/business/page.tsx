@@ -11,16 +11,49 @@ import { Alert, AlertDescription } from '@/components/ui/alert';
 import Link from 'next/link';
 import { Building2, Mail, Lock, User, Phone, MapPin, FileText } from 'lucide-react';
 
+const EMAIL_RE =
+  /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+function normalizeEmail(raw: string) {
+  return raw.trim().toLowerCase();
+}
+
+function readableAuthError(err: unknown): string {
+  if (err instanceof Error && 'message' in err) {
+    const msg = err.message;
+    const lower = msg.toLowerCase();
+
+    if (
+      lower.includes('rate limit') ||
+      lower.includes('over_email_send') ||
+      lower.includes('too many requests')
+    ) {
+      return 'Too many signup or email attempts from your connection. Supabase temporarily blocks this to prevent abuse. Wait about an hour, use a different network/VPN, or in Supabase Dashboard go to Authentication → Rate Limits and adjust limits for development.';
+    }
+
+    if (lower.includes('invalid') && (lower.includes('email') || lower.includes('login'))) {
+      return `${msg} Check for extra spaces, copy-paste issues, or try typing the address again.`;
+    }
+
+    return msg;
+  }
+
+  if (err && typeof err === 'object' && 'message' in err) {
+    const m = (err as { message: string }).message;
+    if (typeof m === 'string' && m) return readableAuthError(new Error(m));
+  }
+
+  return 'Authentication failed';
+}
+
 export default function BusinessAuth() {
   const router = useRouter();
   const [fullName, setFullName] = useState('');
   const [email, setEmail] = useState('');
   const [phone, setPhone] = useState('');
-  const [businessName, setBusinessName] = useState('');
   const [physicalAddress, setPhysicalAddress] = useState('');
   const [tin, setTin] = useState('');
   const [password, setPassword] = useState('');
-  const [confirmPassword, setConfirmPassword] = useState('');
   const [isSignup, setIsSignup] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -31,27 +64,29 @@ export default function BusinessAuth() {
     setLoading(true);
 
     try {
+      const emailNorm = normalizeEmail(email);
+
       if (isSignup) {
         // Validate form
-        if (!fullName || !email || !phone || !businessName || !physicalAddress || !tin || !password || !confirmPassword) {
+        if (!fullName || !emailNorm || !phone || !physicalAddress || !tin || !password) {
           throw new Error('All fields are required');
         }
 
-        if (password !== confirmPassword) {
-          throw new Error('Passwords do not match');
+        if (!EMAIL_RE.test(emailNorm)) {
+          throw new Error('Please enter a valid email address (e.g. name@gmail.com).');
         }
 
-        if (password.length < 6) {
-          throw new Error('Password must be at least 6 characters');
+        if (password.length < 8) {
+          throw new Error('Password must be at least 8 characters');
         }
 
         if (tin.length !== 10 || !/^\d{10}$/.test(tin)) {
           throw new Error('TIN must be exactly 10 digits');
         }
 
-        // Sign up
+        // Sign up (normalized email avoids hidden spaces / casing issues)
         const { data: authData, error: authError } = await supabase.auth.signUp({
-          email,
+          email: emailNorm,
           password,
         });
 
@@ -63,7 +98,7 @@ export default function BusinessAuth() {
             .from('profiles')
             .insert({
               id: authData.user.id,
-              email,
+              email: emailNorm,
               name: fullName,
               phone,
               role: 'BUSINESS',
@@ -76,7 +111,7 @@ export default function BusinessAuth() {
             .from('businesses')
             .insert({
               owner_id: authData.user.id,
-              name: businessName,
+              name: fullName.trim(),
               physical_address: physicalAddress,
               tin,
               status: 'PENDING',
@@ -90,8 +125,15 @@ export default function BusinessAuth() {
         router.push('/pending');
       } else {
         // Sign in
+        if (!emailNorm) {
+          throw new Error('Enter your email address.');
+        }
+        if (!EMAIL_RE.test(emailNorm)) {
+          throw new Error('Please enter a valid email address.');
+        }
+
         const { error: authError } = await supabase.auth.signInWithPassword({
-          email,
+          email: emailNorm,
           password,
         });
 
@@ -99,7 +141,7 @@ export default function BusinessAuth() {
         router.push('/dashboard/business');
       }
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Authentication failed');
+      setError(readableAuthError(err));
     } finally {
       setLoading(false);
     }
@@ -126,7 +168,7 @@ export default function BusinessAuth() {
             </Alert>
           )}
 
-          <form onSubmit={handleSubmit} className="space-y-4">
+          <form noValidate onSubmit={handleSubmit} className="space-y-4">
             {isSignup && (
               <>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -157,20 +199,6 @@ export default function BusinessAuth() {
                       required
                     />
                   </div>
-                </div>
-
-                <div>
-                  <label className="text-sm font-medium flex items-center gap-2">
-                    <Building2 className="w-4 h-4" />
-                    Business Name
-                  </label>
-                  <Input
-                    type="text"
-                    placeholder="Wellness Therapy Centre"
-                    value={businessName}
-                    onChange={(e) => setBusinessName(e.target.value)}
-                    required
-                  />
                 </div>
 
                 <div>
@@ -228,28 +256,13 @@ export default function BusinessAuth() {
               </label>
               <Input
                 type="password"
-                placeholder="At least 6 characters"
+                placeholder={isSignup ? 'At least 8 characters' : 'Your password'}
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 required
+                minLength={isSignup ? 8 : undefined}
               />
             </div>
-
-            {isSignup && (
-              <div>
-                <label className="text-sm font-medium flex items-center gap-2">
-                  <Lock className="w-4 h-4" />
-                  Confirm Password
-                </label>
-                <Input
-                  type="password"
-                  placeholder="Confirm password"
-                  value={confirmPassword}
-                  onChange={(e) => setConfirmPassword(e.target.value)}
-                  required
-                />
-              </div>
-            )}
 
             <Button type="submit" className="w-full bg-secondary hover:bg-secondary/90 text-secondary-foreground" disabled={loading}>
               {loading ? 'Processing...' : isSignup ? 'Register Business' : 'Sign In'}
@@ -258,16 +271,14 @@ export default function BusinessAuth() {
 
           <button
             type="button"
-            onClick={() => {
+            onClick={    () => {
               setIsSignup(!isSignup);
               setError(null);
               setFullName('');
               setPhone('');
-              setBusinessName('');
               setPhysicalAddress('');
               setTin('');
               setPassword('');
-              setConfirmPassword('');
             }}
             className="text-sm text-secondary-foreground hover:underline w-full text-center"
           >

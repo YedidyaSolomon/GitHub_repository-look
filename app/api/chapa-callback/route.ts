@@ -2,6 +2,12 @@ import { supabaseAdmin } from '@/lib/supabase-admin';
 import { NextRequest, NextResponse } from 'next/server';
 
 export async function POST(request: NextRequest) {
+  if (process.env.NEXT_PUBLIC_USE_MOCK === 'true') {
+    return NextResponse.json(
+      { error: 'Chapa callback disabled in demo mode.' },
+      { status: 501 }
+    );
+  }
   try {
     const body = await request.json();
     const { tx_ref } = body;

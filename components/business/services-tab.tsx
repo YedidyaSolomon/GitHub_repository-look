@@ -95,24 +95,40 @@ export default function ServicesTab({
     <Card>
       <CardHeader className="flex flex-row items-center justify-between">
         <CardTitle>Services</CardTitle>
-        <Dialog open={open} onOpenChange={setOpen}>
+        <Dialog
+          open={open}
+          onOpenChange={(next) => {
+            setOpen(next);
+            if (!next) resetForm();
+          }}
+        >
           <DialogTrigger asChild>
-            <Button onClick={resetForm}>
+            <Button
+              onClick={() => {
+                resetForm();
+              }}
+            >
               <Plus className="w-4 h-4 mr-2" />
               Add Service
             </Button>
           </DialogTrigger>
-          <DialogContent>
+          <DialogContent className="max-h-[min(90vh,720px)] overflow-y-auto sm:max-w-lg">
             <DialogHeader>
               <DialogTitle>
                 {editingService ? "Edit" : "Add"} Service
               </DialogTitle>
+              <DialogDescription>
+                Images upload to Supabase Storage. Assign one or more specialists.
+              </DialogDescription>
             </DialogHeader>
             <ServiceForm
               businessId={businessId}
               service={editingService}
               onSubmit={handleServiceSubmit}
-              onCancel={resetForm}
+              onCancel={() => {
+                setOpen(false);
+                resetForm();
+              }}
             />
           </DialogContent>
         </Dialog>
@@ -129,11 +145,13 @@ export default function ServicesTab({
             businessId={businessId}
             setServices={setServices}
             onEdit={(serviceId) => {
-              const service = services.find((s) => s.id === serviceId);
-              setEditingService(service || null);
+              const svc = services.find((s) => s.id === serviceId);
+              setEditingService(svc || null);
               setOpen(true);
             }}
-            onDelete={() => {}}
+            onDelete={(serviceId) =>
+              setServices(services.filter((s) => s.id !== serviceId))
+            }
           />
         )}
       </CardContent>

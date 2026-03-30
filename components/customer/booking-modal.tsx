@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { submitBookingRequest } from '@/lib/bookings-client';
 import { supabase, Service, Specialist } from '@/lib/supabase';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -134,17 +135,7 @@ export default function BookingModal({
         bookingData.guest_phone = formData.customer_phone;
       }
 
-      // Delegate double-booking validation and insert to the server API
-      const response = await fetch('/api/bookings', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(bookingData),
-      });
-
-      const responseData = await response.json();
-      if (!response.ok) {
-        throw new Error(responseData.error || 'Failed to create booking.');
-      }
+      await submitBookingRequest(bookingData);
 
       alert('Booking created successfully! Check your email for confirmation.');
       onOpenChange(false);

@@ -14,6 +14,7 @@ import HeroSearch from "@/components/landing/hero-search";
 import StepsSection from "@/components/landing/steps-section";
 import MapSection from "@/components/landing/map-section";
 import TestimonialsSection from "@/components/landing/testimonials-section";
+import Image from "next/image";
 import BusinessCard from "@/components/customer/business-card";
 
 interface SimpleBusiness {
@@ -134,9 +135,14 @@ export default function LandingPage() {
                 Admin approved providers
               </p>
             </div>
-            <Button asChild size="lg" className="font-bold text-lg px-12">
-              <Link href="#featured">Explore Services</Link>
-            </Button>
+            <div className="flex flex-col items-center gap-3 sm:flex-row sm:justify-center">
+              <Button asChild size="lg" className="font-bold text-lg px-12">
+                <Link href="#featured">Explore Services</Link>
+              </Button>
+              <Button asChild size="lg" variant="secondary" className="font-bold text-lg px-10">
+                <Link href="/book">Book a visit (guest)</Link>
+              </Button>
+            </div>
           </div>
         </div>
       </section>
@@ -282,11 +288,15 @@ export default function LandingPage() {
         <div className="container mx-auto px-6">
           <div className="grid grid-cols-2 md:grid-cols-4 gap-12 items-start text-left md:text-center">
             <div>
-              <div className="flex items-center gap-3 mb-8">
-                <div className="w-10 h-10 bg-gradient-to-r from-[var(--purple)] to-[var(--gold)] rounded-xl flex items-center justify-center text-white font-bold text-lg">
-                  DH
-                </div>
-                <span className="font-bold text-2xl">Dvora Hub</span>
+              <div className="flex items-center justify-center mb-8">
+                <Image
+                  src="/devora1.jpg"
+                  alt="Dvora Hub"
+                  width={200}
+                  height={50}
+                  className="h-12 w-auto max-w-[200px] object-contain"
+                  priority
+                />
               </div>
               <p className="text-muted-foreground leading-relaxed mb-6">
                 Connecting customers with trusted therapy and wellness

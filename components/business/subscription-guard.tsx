@@ -3,7 +3,7 @@
 import { Business } from '@/lib/supabase';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
-import { AlertTriangle, Clock } from 'lucide-react';
+import { AlertTriangle } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 
 interface SubscriptionGuardProps {
@@ -14,8 +14,7 @@ interface SubscriptionGuardProps {
 export default function SubscriptionGuard({ business, children }: SubscriptionGuardProps) {
   const router = useRouter();
 
-  // If subscription is active, show children normally
-  if (business.subscription_status === 'ACTIVE') {
+  if (business.subscription_status === 'ACTIVE' || business.is_active_subscription) {
     return <>{children}</>;
   }
 
@@ -29,13 +28,13 @@ export default function SubscriptionGuard({ business, children }: SubscriptionGu
             <p className="font-semibold">Subscription Required</p>
             <p>
               Your subscription is not active. Management features are limited.
-              {business.subscription_status === 'APPROVED' && 
+              {business.status === 'APPROVED' &&
                 ' Please complete the subscription setup to access all features.'}
             </p>
-            {business.subscription_status === 'APPROVED' && (
+            {business.status === 'APPROVED' && (
               <Button
                 size="sm"
-                onClick={() => router.refresh()}
+                onClick={() => router.push('/dashboard/business/subscribe')}
                 className="mt-2"
               >
                 Complete Subscription

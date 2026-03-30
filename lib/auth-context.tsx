@@ -1,6 +1,6 @@
 'use client';
 
-import React, { createContext, useContext, useEffect, useState } from 'react';
+import React, { createContext, useCallback, useContext, useEffect, useState } from 'react';
 import { supabase, type Profile, type Business } from './supabase';
 
 interface AuthContextType {
@@ -9,6 +9,8 @@ interface AuthContextType {
   loading: boolean;
   error: string | null;
   signOut: () => Promise<void>;
+  /** Refetch profile + business without toggling initial loading (e.g. after Chapa return). */
+  refreshUser: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -19,59 +21,73 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
-    const initAuth = async () => {
-      try {
-        // Get current session
-        const { data: { session } } = await supabase.auth.getSession();
-        
-        if (session?.user) {
-          // Fetch user profile
-          const { data: profileData, error: profileError } = await supabase
-            .from('profiles')
-            .select('*')
-            .eq('id', session.user.id)
-            .single();
+  const loadUserData = useCallback(async (isInitial: boolean) => {
+    try {
+      if (isInitial) setLoading(true);
+      setError(null);
 
-          if (profileError) {
-            console.error('Profile fetch error:', profileError);
-            setError('Failed to load profile');
-          } else {
-            setProfile(profileData);
+      const { data: { session } } = await supabase.auth.getSession();
 
-            // If user is a business, fetch their business data
-            if (profileData?.role === 'BUSINESS') {
-              const { data: businessData, error: businessError } = await supabase
-                .from('businesses')
-                .select('*')
-                .eq('owner_id', session.user.id)
-                .single();
-
-              if (!businessError && businessData) {
-                setBusiness(businessData);
-              }
-            }
-          }
-        }
-      } catch (err) {
-        console.error('Auth initialization error:', err);
-        setError('Authentication failed');
-      } finally {
-        setLoading(false);
+      if (!session?.user) {
+        setProfile(null);
+        setBusiness(null);
+        return;
       }
-    };
 
-    initAuth();
+      const { data: profileData, error: profileError } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('id', session.user.id)
+        .single();
 
-    // Listen for auth changes
+      if (profileError) {
+        console.error('Profile fetch error:', profileError);
+        setError('Failed to load profile');
+        setProfile(null);
+        setBusiness(null);
+        return;
+      }
+
+      setProfile(profileData);
+
+      if (profileData?.role === 'BUSINESS') {
+        const { data: businessData, error: businessError } = await supabase
+          .from('businesses')
+          .select('*')
+          .eq('owner_id', session.user.id)
+          .single();
+
+        if (!businessError && businessData) {
+          setBusiness(businessData);
+        } else {
+          setBusiness(null);
+        }
+      } else {
+        setBusiness(null);
+      }
+    } catch (err) {
+      console.error('Auth initialization error:', err);
+      setError('Authentication failed');
+    } finally {
+      if (isInitial) setLoading(false);
+    }
+  }, []);
+
+  const refreshUser = useCallback(async () => {
+    await loadUserData(false);
+  }, [loadUserData]);
+
+  useEffect(() => {
+    void loadUserData(true);
+
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, session) => {
         if (event === 'SIGNED_OUT') {
           setProfile(null);
           setBusiness(null);
+          setLoading(false);
         } else if (session?.user) {
-          // Re-initialize on auth change
-          await initAuth();
+          await loadUserData(true);
         }
       }
     );
@@ -79,7 +95,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     return () => {
       subscription.unsubscribe();
     };
-  }, []);
+  }, [loadUserData]);
 
   const signOut = async () => {
     try {
@@ -93,7 +109,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   return (
-    <AuthContext.Provider value={{ profile, business, loading, error, signOut }}>
+    <AuthContext.Provider value={{ profile, business, loading, error, signOut, refreshUser }}>
       {children}
     </AuthContext.Provider>
   );

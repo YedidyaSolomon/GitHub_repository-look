@@ -35,11 +35,8 @@ import { toast } from "@/components/ui/use-toast";
 import {
   Edit,
   Trash2,
-  Image,
-  Calendar,
-  Clock,
-  DollarSign,
   Eye,
+  X,
 } from "lucide-react";
 
 interface ServiceTableProps {
